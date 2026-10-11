@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#0b0c0c" />
+  <link rel="icon" href="data:," />
+  <title>Strobe Light App</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --paper: #f5f6f2;
+      --ink: #101211;
+      --muted: #5a615c;
+      --line: #c9cec9;
+      --panel: #ffffff;
+      --acid: #c8ff24;
+      --cyan: #00d7e8;
+      --hot: #ff4a1c;
+      --shadow: 0 18px 60px rgba(16,18,17,.11);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #0b0c0c;
+        --ink: #f3f5ef;
+        --muted: #a8afa9;
+        --line: #303532;
+        --panel: #151816;
+        --shadow: 0 20px 70px rgba(0,0,0,.42);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
+    body {
+      font-family: "Avenir Next", "Helvetica Neue", Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .shell {
+      width: min(100%, 760px);
+      margin: 0 auto;
+      padding: max(22px, env(safe-area-inset-top)) 20px max(40px, env(safe-area-inset-bottom));
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin: 2px 0 28px;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-size: .83rem;
+      font-weight: 650;
+      color: var(--muted);
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #8a918c;
+      box-shadow: 0 0 0 4px color-mix(in srgb, #8a918c 16%, transparent);
+    }
+    .dot.live { background: #60d32a; box-shadow: 0 0 0 4px color-mix(in srgb, #60d32a 18%, transparent); }
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 3px;
+      background: color-mix(in srgb, var(--line) 46%, transparent);
+      border-radius: 10px;
+    }
+    .mode-switch button {
+      border: 0;
+      background: transparent;
+      border-radius: 7px;
+      min-height: 32px;
+      padding: 0 13px;
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .mode-switch button.active { background: var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+    .beat-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 24px;
+      padding: 8px 0 30px;
+      border-bottom: 1px solid var(--line);
+    }
+    .label { font-size: .86rem; font-weight: 650; color: var(--muted); margin-bottom: 6px; }
+    .tempo-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+    .tempo {
+      font-family: "DIN Condensed", "Avenir Next Condensed", Impact, sans-serif;
+      font-size: clamp(5rem, 19vw, 8rem);
+      font-weight: 800;
+      letter-spacing: -.045em;
+      line-height: .85;
+      font-variant-numeric: tabular-nums;
+    }
+    .unit { font-size: 1rem; font-weight: 750; letter-spacing: .08em; }
+    .confidence { margin-top: 12px; font-size: .86rem; color: var(--muted); }
+    .meter { display: flex; align-items: end; gap: 4px; height: 58px; width: 66px; }
+    .meter i { display: block; flex: 1; min-height: 5px; height: 8%; background: var(--line); border-radius: 2px 2px 0 0; transition: height .08s linear, background .15s; }
+    .meter.hot i { background: var(--acid); }
+    .main-control {
+      display: grid;
+      place-items: center;
+      padding: 34px 0 28px;
+    }
+    .power {
+      width: min(66vw, 224px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: transform .14s ease, border-color .2s, background .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .power:active { transform: scale(.98); }
+    .power:focus-visible { outline: 3px solid var(--cyan); outline-offset: 5px; }
+    .power-core {
+      width: 72%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--ink);
+      color: var(--paper);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .power-core svg { width: 38px; height: 38px; margin-bottom: 7px; }
+    .power-core span { display: block; font-size: .77rem; font-weight: 800; letter-spacing: .11em; }
+    .power.armed { border-color: var(--hot); }
+    .power.armed .power-core { background: var(--hot); color: #fff; }
+    .hint { max-width: 390px; margin: 15px auto 0; text-align: center; color: var(--muted); font-size: .84rem; line-height: 1.45; }
+    .connect {
+      border: 0;
+      border-bottom: 1px solid currentColor;
+      background: transparent;
+      padding: 0 0 2px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 20px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.05);
+    }
+    .panel + .panel { margin-top: 12px; }
+    .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+    .panel-head h2 { margin: 0; font-size: 1rem; letter-spacing: -.01em; }
+    .panel-head output { color: var(--muted); font: 700 .82rem Menlo, Consolas, monospace; }
+    .palettes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .palette {
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
+      border-radius: 9px;
+    }
+    .palette[aria-pressed="true"] { border-color: var(--ink); padding: 3px; }
+    .stripe { height: 52px; border-radius: 6px; background: var(--swatch); }
+    .palette small { display: block; text-align: center; margin-top: 7px; font-size: .72rem; color: var(--muted); font-weight: 650; }
+    .control { display: grid; grid-template-columns: 115px minmax(0,1fr) 44px; align-items: center; gap: 13px; }
+    .control + .control { margin-top: 17px; }
+    .control label { font-size: .84rem; font-weight: 650; }
+    .control output { text-align: right; color: var(--muted); font: 650 .74rem Menlo, Consolas, monospace; }
+    input[type="range"] { width: 100%; accent-color: var(--hot); }
+    .manual-box { display: none; }
+    .manual-box.show { display: block; }
+    .tap-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    .manual-bpm { font: 800 2.2rem "DIN Condensed", Impact, sans-serif; letter-spacing: -.02em; }
+    .tap {
+      min-width: 120px;
+      min-height: 48px;
+      border: 1px solid var(--ink);
+      background: transparent;
+      border-radius: 8px;
+      font-weight: 800;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .tap:active { background: var(--ink); color: var(--paper); }
+    .notes { margin: 22px 0 0; color: var(--muted); font-size: .78rem; line-height: 1.55; }
+    .notes strong { color: var(--ink); }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: none;
+      place-items: end center;
+      background: rgba(0,0,0,.68);
+      padding: 16px;
+    }
+    .modal.open { display: grid; }
+    .sheet {
+      width: min(100%, 520px);
+      background: var(--panel);
+      color: var(--ink);
+      padding: 26px;
+      border-radius: 18px 18px 10px 10px;
+      box-shadow: 0 30px 90px rgba(0,0,0,.45);
+    }
+    .warning-mark {
+      width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--hot); color: #fff; font-weight: 900; font-size: 1.3rem;
+    }
+    .sheet h2 { margin: 18px 0 9px; font-size: 1.5rem; letter-spacing: -.025em; }
+    .sheet p { margin: 0 0 20px; color: var(--muted); line-height: 1.55; font-size: .92rem; }
+    .sheet-actions { display: grid; gap: 10px; }
+    .sheet-actions button { min-height: 49px; border-radius: 9px; font-weight: 800; cursor: pointer; }
+    .accept { border: 0; background: var(--ink); color: var(--paper); }
+    .cancel { border: 1px solid var(--line); background: transparent; }
+
+    .strobe-field {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: #000;
+      display: none;
+      touch-action: manipulation;
+    }
+    .strobe-field.on { display: block; }
+    .strobe-field.flash { background: var(--flash, #fff); }
+    .strobe-top {
+      position: absolute;
+      top: max(14px, env(safe-area-inset-top));
+      left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .stop {
+      pointer-events: auto;
+      border: 1px solid rgba(255,255,255,.45);
+      background: rgba(0,0,0,.76);
+      color: #fff;
+      min-width: 124px;
+      min-height: 44px;
+      border-radius: 999px;
+      font-weight: 850;
+      letter-spacing: .08em;
+      cursor: pointer;
+    }
+    .lock-readout {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      color: rgba(255,255,255,.72);
+      display: flex;
+      justify-content: space-between;
+      font: 700 .72rem Menlo, Consolas, monospace;
+      text-shadow: 0 1px 4px #000;
+      pointer-events: none;
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      transform: translate(-50%, 20px);
+      z-index: 110;
+      width: min(calc(100% - 32px), 460px);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 12px 16px;
+      border-radius: 9px;
+      font-size: .84rem;
+      font-weight: 650;
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    @media (min-width: 700px) {
+      .shell { padding-left: 28px; padding-right: 28px; }
+      .modal { place-items: center; }
+      .sheet { border-radius: 14px; }
+    }
+    @media (max-width: 430px) {
+      .shell { padding-left: 16px; padding-right: 16px; }
+      .beat-stage { gap: 10px; }
+      .palettes { gap: 6px; }
+      .stripe { height: 46px; }
+      .panel { padding: 17px; }
+      .control { grid-template-columns: 92px minmax(0,1fr) 38px; gap: 9px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="status-row">
+      <div class="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">Mic off</span></div>
+      <div class="mode-switch" aria-label="Tempo source">
+        <button type="button" class="active" data-mode="auto">AUTO</button>
+        <button type="button" data-mode="manual">MANUAL</button>
+      </div>
+    </div>
+
+    <section class="beat-stage" aria-label="Tempo reading">
+      <div>
+        <div class="label" id="tempoLabel">Waiting for music</div>
+        <div class="tempo-line"><span class="tempo" id="tempo">—</span><span class="unit">BPM</span></div>
+        <div class="confidence" id="confidence">Connect the microphone to find the beat.</div>
+      </div>
+      <div class="meter" id="meter" aria-label="Audio level">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+    </section>
+
+    <section class="main-control">
+      <button class="power" id="power" type="button" aria-pressed="false" aria-label="Turn strobe on">
+        <span class="power-core">
+          <span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4v18" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M15.5 9.5A18 18 0 1 0 32.5 9.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+            <span id="powerText">STROBE ON</span>
+          </span>
+        </span>
+      </button>
+      <p class="hint" id="hint">First, <button class="connect" id="connect" type="button">connect your mic</button>. Then put the phone face-up and let the whole screen pulse with the beat.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="colorTitle">
+      <div class="panel-head"><h2 id="colorTitle">Color sequence</h2><output id="paletteName">RGB</output></div>
+      <div class="palettes" id="palettes">
+        <button class="palette" type="button" aria-pressed="true" data-name="RGB" data-colors="#ff204e,#22e7ff,#b7ff27" style="--swatch:linear-gradient(90deg,#ff204e 0 33%,#22e7ff 33% 66%,#b7ff27 66%)"><span class="stripe"></span><small>RGB</small></button>
+        <button class="palette" type="button" aria-pressed="false" data-name="Acid" data-colors="#c8ff24,#00e5c4" style="--swatch:linear-gradient(90deg,#c8ff24 0 50%,#00e5c4 50%)"><span class="stripe"></span><small>Acid</small></button>
+        <button class="palette" type="button" aria-pressed="false" data-name="Heat" data-colors="#ff2f10,#ff9c1a" style="--swatch:linear-gradient(90deg,#ff2f10 0 50%,#ff9c1a 50%)"><span class="stripe"></span><small>Heat</small></button>
+        <button class="palette" type="button" aria-pressed="false" data-name="White" data-colors="#ffffff" style="--swatch:#fff"><span class="stripe"></span><small>White</small></button>
+      </div>
+    </section>
+
+    <section class="panel manual-box" id="manualBox" aria-labelledby="manualTitle">
+      <div class="panel-head"><h2 id="manualTitle">Tap tempo</h2><output>4+ TAPS</output></div>
+      <div class="tap-row"><div><div class="label">Manual tempo</div><div class="manual-bpm"><span id="manualBpm">120</span> BPM</div></div><button class="tap" id="tap" type="button">TAP</button></div>
+    </section>
+
+    <section class="panel" aria-labelledby="feelTitle">
+      <div class="panel-head"><h2 id="feelTitle">Light feel</h2><output id="feelName">BALANCED</output></div>
+      <div class="control"><label for="brightness">Brightness</label><input id="brightness" type="range" min="30" max="100" value="85" /><output id="brightnessOut">85%</output></div>
+      <div class="control"><label for="pulseWidth">Flash length</label><input id="pulseWidth" type="range" min="35" max="150" value="80" /><output id="pulseOut">80ms</output></div>
+      <div class="control" id="sensitivityRow"><label for="sensitivity">Sensitivity</label><input id="sensitivity" type="range" min="110" max="220" value="145" /><output id="sensitivityOut">1.45×</output></div>
+    </section>
+
+    <p class="notes"><strong>For best results:</strong> keep the phone near a speaker and away from hands covering its mic. The detector listens on-device; audio is not recorded or uploaded. Use in a dark, stationary space—not near roads or stairs.</p>
+  </main>
+
+  <div class="modal" id="warning" role="dialog" aria-modal="true" aria-labelledby="warningTitle">
+    <div class="sheet">
+      <div class="warning-mark">!</div>
+      <h2 id="warningTitle">Rapid flashing warning</h2>
+      <p>Strobe lights can trigger seizures or migraines. Warn everyone nearby, stop immediately if anyone feels unwell, and avoid use around people with photosensitivity. This app limits flashes to 3 per second.</p>
+      <div class="sheet-actions">
+        <button class="accept" id="accept" type="button">I understand — continue</button>
+        <button class="cancel" id="cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="strobe-field" id="strobeField" aria-hidden="true">
+    <div class="strobe-top"><button class="stop" id="stop" type="button">STOP</button></div>
+    <div class="lock-readout"><span id="overlayMode">AUTO LOCK</span><span id="overlayBpm">— BPM</span></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (function () {
+    'use strict';
+    var state = {
+      mode: 'auto', micReady: false, strobeOn: false, warned: false,
+      bpm: null, manualBpm: 120, confidence: 0, colors: ['#ff204e','#22e7ff','#b7ff27'],
+      colorIndex: 0, audioContext: null, stream: null, analyser: null, data: null,
+      baseline: 0, lastOnset: 0, lastFlash: 0, onsets: [], nextBeat: 0, flashTimer: null,
+      raf: null, taps: [], pendingAction: null
+    };
+    var $ = function (id) { return document.getElementById(id); };
+    var tempo = $('tempo'), tempoLabel = $('tempoLabel'), confidence = $('confidence');
+    var statusDot = $('statusDot'), statusText = $('statusText'), meter = $('meter');
+    var power = $('power'), powerText = $('powerText'), hint = $('hint');
+    var warning = $('warning'), strobeField = $('strobeField');
+    var bars = Array.prototype.slice.call(meter.querySelectorAll('i'));
+
+    function toast(msg) {
+      var el = $('toast'); el.textContent = msg; el.classList.add('show');
+      clearTimeout(el._t); el._t = setTimeout(function(){ el.classList.remove('show'); }, 3200);
+    }
+    function setStatus(text, live) {
+      statusText.textContent = text;
+      statusDot.classList.toggle('live', !!live);
+    }
+    function openWarning(action) {
+      state.pendingAction = action;
+      warning.classList.add('open');
+      $('accept').focus();
+    }
+    function closeWarning() { warning.classList.remove('open'); state.pendingAction = null; }
+    function requestAction(action) {
+      if (!state.warned) { openWarning(action); return; }
+      action();
+    }
+
+    async function startMic() {
+      if (state.micReady) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        useManualFallback('Microphone is unavailable here. Manual tempo is ready.');
+        return;
+      }
+      setStatus('Requesting mic…', false);
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        var ctx = new Ctx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        var source = ctx.createMediaStreamSource(stream);
+        var analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = .2;
+        source.connect(analyser);
+        state.stream = stream; state.audioContext = ctx; state.analyser = analyser;
+        state.data = new Uint8Array(analyser.frequencyBinCount);
+        state.micReady = true; state.baseline = 0;
+        setStatus('Mic listening', true);
+        hint.innerHTML = 'Listening for a steady kick. Press the center button when the BPM locks.';
+        analyze();
+      } catch (err) {
+        useManualFallback('Mic permission was not available. Tap the beat manually instead.');
+      }
+    }
+
+    function useManualFallback(message) {
+      switchMode('manual');
+      setStatus('Manual tempo', true);
+      toast(message);
+    }
+
+    function analyze() {
+      if (!state.micReady || !state.analyser) return;
+      state.analyser.getByteFrequencyData(state.data);
+      var nyquist = state.audioContext.sampleRate / 2;
+      var from = Math.max(1, Math.floor(45 / nyquist * state.data.length));
+      var to = Math.min(state.data.length - 1, Math.ceil(180 / nyquist * state.data.length));
+      var energy = 0;
+      for (var i = from; i <= to; i++) energy += state.data[i] * state.data[i];
+      energy = Math.sqrt(energy / Math.max(1, to - from + 1));
+      state.baseline = state.baseline ? state.baseline * .94 + energy * .06 : energy;
+      var level = Math.min(1, energy / 180);
+      bars.forEach(function(bar, idx){ bar.style.height = Math.max(8, Math.min(100, level * 125 - idx * 7)) + '%'; });
+      meter.classList.toggle('hot', level > .22);
+      var now = performance.now();
+      var threshold = parseInt($('sensitivity').value, 10) / 100;
+      if (energy > Math.max(22, state.baseline * threshold) && now - state.lastOnset > 250) {
+        state.lastOnset = now;
+        state.onsets.push(now);
+        if (state.onsets.length > 28) state.onsets.shift();
+        estimateTempo();
+        if (state.strobeOn && state.mode === 'auto') flash();
+        if (state.bpm) state.nextBeat = now + 60000 / state.bpm;
+      }
+      if (state.strobeOn && state.mode === 'auto' && state.bpm && now >= state.nextBeat) {
+        flash(); state.nextBeat += 60000 / state.bpm;
+      }
+      state.raf = requestAnimationFrame(analyze);
+    }
+
+    function estimateTempo() {
+      if (state.onsets.length < 5) {
+        tempoLabel.textContent = 'Finding the pulse';
+        confidence.textContent = 'Keep the phone near the bass for a few beats.';
+        return;
+      }
+      var candidates = [];
+      for (var i = 1; i < state.onsets.length; i++) {
+        var d = state.onsets[i] - state.onsets[i-1];
+        while (d < 333) d *= 2;
+        while (d > 1000) d /= 2;
+        if (d >= 333 && d <= 1000) candidates.push(d);
+      }
+      if (candidates.length < 4) return;
+      candidates.sort(function(a,b){ return a-b; });
+      var median = candidates[Math.floor(candidates.length / 2)];
+      var near = candidates.filter(function(x){ return Math.abs(x - median) < median * .12; });
+      var avg = near.reduce(function(a,b){ return a+b; }, 0) / Math.max(1, near.length);
+      var bpm = Math.round(60000 / avg);
+      bpm = Math.max(60, Math.min(180, bpm));
+      state.bpm = bpm;
+      state.confidence = Math.min(.99, near.length / candidates.length);
+      updateTempoUI();
+    }
+
+    function updateTempoUI() {
+      var shown = state.mode === 'manual' ? state.manualBpm : state.bpm;
+      tempo.textContent = shown || '—';
+      if (state.mode === 'manual') {
+        tempoLabel.textContent = 'Manual pulse';
+        confidence.textContent = 'Tap at least four beats to tighten the tempo.';
+      } else if (shown) {
+        tempoLabel.textContent = state.confidence > .58 ? 'Beat locked' : 'Beat detected';
+        confidence.textContent = Math.round(state.confidence * 100) + '% lock confidence';
+      }
+      $('overlayBpm').textContent = (shown || '—') + ' BPM';
+    }
+
+    function flash() {
+      if (!state.strobeOn) return;
+      var now = performance.now();
+      if (now - state.lastFlash < 333) return;
+      state.lastFlash = now;
+      var color = state.colors[state.colorIndex % state.colors.length];
+      state.colorIndex++;
+      var brightness = parseInt($('brightness').value,10) / 100;
+      var rgb = hexToRgb(color);
+      strobeField.style.setProperty('--flash', 'rgb(' + Math.round(rgb.r*brightness) + ',' + Math.round(rgb.g*brightness) + ',' + Math.round(rgb.b*brightness) + ')');
+      strobeField.classList.add('flash');
+      clearTimeout(state.flashTimer);
+      state.flashTimer = setTimeout(function(){ strobeField.classList.remove('flash'); }, parseInt($('pulseWidth').value,10));
+    }
+    function hexToRgb(hex) {
+      var n = parseInt(hex.replace('#',''),16);
+      return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};
+    }
+
+    function startStrobe() {
+      if (state.mode === 'auto' && !state.micReady) {
+        requestAction(startMic); return;
+      }
+      state.strobeOn = true; state.colorIndex = 0;
+      power.classList.add('armed'); power.setAttribute('aria-pressed','true'); powerText.textContent = 'STROBE OFF';
+      strobeField.classList.add('on'); strobeField.setAttribute('aria-hidden','false');
+      $('overlayMode').textContent = state.mode === 'auto' ? 'AUTO LOCK' : 'MANUAL';
+      updateTempoUI();
+      if (state.mode === 'manual') {
+        state.nextBeat = performance.now();
+        runManualClock();
+      } else if (state.bpm) {
+        state.nextBeat = performance.now();
+      } else {
+        toast('Listening for a beat — the screen will pulse when one lands.');
+      }
+    }
+    function stopStrobe() {
+      state.strobeOn = false;
+      power.classList.remove('armed'); power.setAttribute('aria-pressed','false'); powerText.textContent = 'STROBE ON';
+      strobeField.classList.remove('on','flash'); strobeField.setAttribute('aria-hidden','true');
+      clearTimeout(state.flashTimer);
+    }
+    function runManualClock() {
+      if (!state.strobeOn || state.mode !== 'manual') return;
+      var now = performance.now();
+      if (now >= state.nextBeat) {
+        flash();
+        var bpm = Math.min(180, Math.max(60, state.manualBpm));
+        state.nextBeat += 60000 / bpm;
+        if (state.nextBeat < now) state.nextBeat = now + 60000 / bpm;
+      }
+      requestAnimationFrame(runManualClock);
+    }
+
+    function switchMode(mode) {
+      if (state.strobeOn) stopStrobe();
+      state.mode = mode;
+      document.querySelectorAll('[data-mode]').forEach(function(btn){ btn.classList.toggle('active', btn.dataset.mode === mode); });
+      $('manualBox').classList.toggle('show', mode === 'manual');
+      $('sensitivityRow').style.display = mode === 'manual' ? 'none' : 'grid';
+      $('overlayMode').textContent = mode === 'auto' ? 'AUTO LOCK' : 'MANUAL';
+      if (mode === 'manual') {
+        setStatus('Manual tempo', true);
+        hint.textContent = 'Tap the beat, then press the center button to fill the screen with color.';
+      } else {
+        setStatus(state.micReady ? 'Mic listening' : 'Mic off', state.micReady);
+        hint.innerHTML = state.micReady ? 'Listening for a steady kick. Press the center button when the BPM locks.' : 'First, <button class="connect" id="connectInline" type="button">connect your mic</button>. Then put the phone face-up and let the whole screen pulse with the beat.';
+        var inline = $('connectInline'); if (inline) inline.addEventListener('click', function(){ requestAction(startMic); });
+      }
+      updateTempoUI();
+    }
+
+    document.querySelectorAll('[data-mode]').forEach(function(btn){ btn.addEventListener('click', function(){ switchMode(btn.dataset.mode); }); });
+    $('connect').addEventListener('click', function(){ requestAction(startMic); });
+    power.addEventListener('click', function(){ if (state.strobeOn) stopStrobe(); else requestAction(startStrobe); });
+    $('stop').addEventListener('click', stopStrobe);
+    $('cancel').addEventListener('click', closeWarning);
+    $('accept').addEventListener('click', function(){
+      var action = state.pendingAction; state.warned = true; closeWarning(); if (action) action();
+    });
+    warning.addEventListener('click', function(e){ if (e.target === warning) closeWarning(); });
+
+    document.querySelectorAll('.palette').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.palette').forEach(function(x){ x.setAttribute('aria-pressed','false'); });
+        btn.setAttribute('aria-pressed','true');
+        state.colors = btn.dataset.colors.split(',');
+        $('paletteName').textContent = btn.dataset.name;
+      });
+    });
+
+    $('tap').addEventListener('click', function(){
+      var now = performance.now();
+      if (state.taps.length && now - state.taps[state.taps.length-1] > 2200) state.taps = [];
+      state.taps.push(now); if (state.taps.length > 8) state.taps.shift();
+      if (state.taps.length >= 2) {
+        var sum = 0;
+        for (var i=1;i<state.taps.length;i++) sum += state.taps[i]-state.taps[i-1];
+        state.manualBpm = Math.round(60000 / (sum / (state.taps.length-1)));
+        state.manualBpm = Math.max(60, Math.min(180, state.manualBpm));
+        $('manualBpm').textContent = state.manualBpm;
+        updateTempoUI();
+      }
+      $('tap').animate([{transform:'scale(1)'},{transform:'scale(.96)'},{transform:'scale(1)'}],{duration:120});
+    });
+
+    $('brightness').addEventListener('input', function(){ $('brightnessOut').textContent = this.value + '%'; });
+    $('pulseWidth').addEventListener('input', function(){ $('pulseOut').textContent = this.value + 'ms'; $('feelName').textContent = this.value < 65 ? 'CRISP' : this.value > 110 ? 'WIDE' : 'BALANCED'; });
+    $('sensitivity').addEventListener('input', function(){ $('sensitivityOut').textContent = (this.value/100).toFixed(2) + '×'; });
+    document.addEventListener('visibilitychange', function(){ if (document.hidden && state.strobeOn) stopStrobe(); });
+    window.addEventListener('beforeunload', function(){ if (state.stream) state.stream.getTracks().forEach(function(t){ t.stop(); }); });
+  }());
+  </script>
+</body>
+</html>
